@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatBot with Retrieval</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            font-size: 14px;
+        }
+
+        .user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .assistant .message-content {
+            background: #e8eaed;
+            color: #202124;
+        }
+
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .loading-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: bounce 1.4s infinite;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                opacity: 0.3;
+            }
+            40% {
+                opacity: 1;
+            }
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="password"] {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 180px;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .setup-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .setup-screen h2 {
+            color: #202124;
+            margin-bottom: 10px;
+        }
+
+        .setup-screen p {
+            color: #5f6368;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .api-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .retrieval-info {
+            background: #f0f4ff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #5f6368;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .source-badge {
+            display: inline-block;
+            background: #f0f4ff;
+            color: #667eea;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 ChatBot with Retrieval</h1>
+            <p id="api-status">Enter your Claude API key to start</p>
+        </div>
+
+        <div id="setupScreen" class="chat-container setup-screen">
+            <h2>Get Started</h2>
+            <p>This chatbot retrieves information from a knowledge base and uses Claude to generate intelligent responses.</p>
+            <div class="retrieval-info">
+                📚 <strong>Knowledge Base:</strong> Contains info about Web Development, AI/ML, Cloud Computing, and more.
+            </div>
+            <div class="api-input-group">
+                <input 
+                    type="password" 
+                    id="apiKeyInput" 
+                    placeholder="sk-ant-..."
+                    onkeypress="if(event.key==='Enter') initializeChat()"
+                >
+                <button onclick="initializeChat()">Start Chat</button>
+            </div>
+            <p style="font-size: 12px; color: #9aa0a6;">Get your free API key at <strong>console.anthropic.com</strong></p>
+            <p id="setupError" class="error-message"></p>
+        </div>
+
+        <div id="chatScreen" class="chat-container" style="display: none;"></div>
+
+        <div id="inputArea" class="input-area" style="display: none;">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Ask me anything..."
+                    onkeypress="if(event.key==='Enter') sendMessage()"
+                >
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const KNOWLEDGE_BASE = [
+            {
+                id: 1,
+                title: "Web Development Basics",
+                content: "Web development involves creating and maintaining websites. Key technologies include HTML for structure, CSS for styling, and JavaScript for interactivity. Modern web development uses frameworks like React, Vue, and Angular for building dynamic user interfaces. Backend technologies include Node.js, Python, Java, and databases like PostgreSQL, MongoDB."
+            },
+            {
+                id: 2,
+                title: "Machine Learning Fundamentals",
+                content: "Machine Learning is a subset of AI that enables systems to learn and improve from experience. Key concepts include supervised learning (with labeled data), unsupervised learning (finding patterns), and reinforcement learning (learning through rewards). Popular libraries include TensorFlow, PyTorch, and scikit-learn. Common algorithms include decision trees, neural networks, and support vector machines."
+            },
+            {
+                id: 3,
+                title: "Cloud Computing Services",
+                content: "Cloud computing provides on-demand access to computing resources. Main service models: IaaS (Infrastructure as a Service) - AWS, Azure, GCP; PaaS (Platform as a Service) - Heroku, Firebase; SaaS (Software as a Service) - Salesforce, Office 365. Benefits include scalability, cost-efficiency, and accessibility. Popular cloud providers offer databases, storage, computing power, and AI services."
+            },
+            {
+                id: 4,
+                title: "Data Science Pipeline",
+                content: "The data science workflow includes: 1) Data Collection - gathering raw data; 2) Data Cleaning - removing errors and inconsistencies; 3) Exploratory Data Analysis (EDA) - understanding patterns; 4) Feature Engineering - creating meaningful features; 5) Model Building - training algorithms; 6) Evaluation - measuring performance; 7) Deployment - putting model in production. Tools: Pandas, NumPy, Matplotlib, Scikit-learn."
+            },
+            {
+                id: 5,
+                title: "API Design Best Practices",
+                content: "RESTful APIs should follow principles: 1) Use HTTP methods correctly (GET, POST, PUT, DELETE); 2) Endpoint naming - use nouns not verbs (/users not /getUsers); 3) Status codes - 200 (OK), 201 (Created), 400 (Bad Request), 404 (Not Found), 500 (Server Error); 4) Versioning - /api/v1/; 5) Authentication - use JWT or OAuth; 6) Documentation - provide clear examples; 7) Rate limiting - prevent abuse."
+            },
+            {
+                id: 6,
+                title: "Docker and Containerization",
+                content: "Docker packages applications into containers - lightweight, standalone executable packages. Benefits: consistency across environments, easy deployment, resource efficiency. Key concepts: Images (blueprints), Containers (running instances), Docker Hub (repository). Common commands: docker run, docker build, docker push. Orchestration tools: Kubernetes, Docker Swarm. Used in CI/CD pipelines for automated testing and deployment."
+            },
+            {
+                id: 7,
+                title: "Git and Version Control",
+                content: "Git is a distributed version control system. Key concepts: Repository (project folder), Commit (snapshot of changes), Branch (independent line of development), Merge (combining branches). Common workflows: Feature branches, Pull Requests (code review), Git Flow. Commands: git clone, git commit, git push, git pull. Platforms: GitHub, GitLab, Bitbucket. Best practices: meaningful commit messages, regular commits, code reviews."
+            },
+            {
+                id: 8,
+                title: "Security Best Practices",
+                content: "Web security essentials: 1) HTTPS/SSL - encrypt data in transit; 2) Input validation - prevent SQL injection, XSS; 3) Authentication - strong passwords, 2FA; 4) Authorization - role-based access control; 5) Secrets management - secure API keys; 6) CORS - control cross-origin requests; 7) Dependencies - keep packages updated; 8) Monitoring - detect suspicious activity; 9) Data protection - encrypt sensitive data at rest."
+            }
+        ];
+
+        let apiKey = null;
+        let chatHistory = [];
+
+        async function initializeChat() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (!key) {
+                document.getElementById('setupError').textContent = 'Please enter your API key';
+                return;
+            }
+            apiKey = key;
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('chatScreen').style.display = 'block';
+            document.getElementById('inputArea').style.display = 'flex';
+            document.getElementById('api-status').textContent = 'Connected ✓';
+            chatHistory = [];
+            addMessage('assistant', 'Hello! 👋 I have access to a knowledge base covering Web Development, Machine Learning, Cloud Computing, Data Science, APIs, Docker, Git, and Security. Ask me anything!');
+        }
+
+        function addMessage(role, content) {
+            const chatScreen = document.getElementById('chatScreen');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(contentDiv);
+            chatScreen.appendChild(messageDiv);
+            chatScreen.scrollTop = chatScreen.scrollHeight;
+            
+            chatHistory.push({ role, content });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            input.value = '';
+            addMessage('user', message);
+            
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant';
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+            loadingDiv.appendChild(contentDiv);
+            document.getElementById('chatScreen').appendChild(loadingDiv);
+            document.getElementById('chatScreen').scrollTop = document.getElementById('chatScreen').scrollHeight;
+            
+            try {
+                const response = await retrieveAndRespond(message);
+                loadingDiv.remove();
+                addMessage('assistant', response);
+            } catch (error) {
+                loadingDiv.remove();
+                addMessage('assistant', `Error: ${error.message}`);
+            }
+        }
+
+        async function retrieveAndRespond(userMessage) {
+            const retrievalPrompt = `Given this user query: "${userMessage}"
+            
+Here is a knowledge base with documents:
+${KNOWLEDGE_BASE.map(doc => `[Doc ${doc.id}] ${doc.title}: ${doc.content}`).join('\n\n')}
+
+Which documents are most relevant to answer the user's query? List the document IDs and explain briefly why.`;
+
+            const retrievalResponse = await callClaude(retrievalPrompt);
+            
+            const responsePrompt = `User question: "${userMessage}"
+
+Relevant knowledge base information:
+${extractRelevantDocs(retrievalResponse).join('\n\n')}
+
+Based on the above knowledge, provide a helpful and accurate answer to the user's question. Keep the answer concise and informative.`;
+
+            return await callClaude(responsePrompt);
+        }
+
+        function extractRelevantDocs(retrievalResponse) {
+            const docIds = [];
+            const docIdRegex = /(?:Doc|document)\s*(\d+)/gi;
+            let match;
+            while ((match = docIdRegex.exec(retrievalResponse)) !== null) {
+                const id = parseInt(match[1]);
+                if (id <= KNOWLEDGE_BASE.length && !docIds.includes(id)) {
+                    docIds.push(id);
+                }
+            }
+            
+            if (docIds.length === 0) {
+                return KNOWLEDGE_BASE.map(doc => `[${doc.title}] ${doc.content}`);
+            }
+            
+            return docIds.map(id => {
+                const doc = KNOWLEDGE_BASE.find(d => d.id === id);
+                return `[${doc.title}] ${doc.content}`;
+            });
+        }
+
+        async function callClaude(message) {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-opus-4-1',
+                    max_tokens: 1024,
+                    messages: [{ role: 'user', content: message }]
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error?.message || 'API Error');
+            }
+
+            const data = await response.json();
+            return data.content[0].text;
+        }
+    </script>
+</body>
+</html>
